@@ -6,59 +6,93 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Loader2 } from "lucide-react"
 
-// Mock function to estimate price based on device details
-const estimatePrice = (deviceDetails) => {
-  // This is a simplified estimation. In a real-world scenario, you'd have a more complex algorithm
-  const basePrice = {
-    Smartphone: 200,
-    Tablet: 150,
-  }
-
-  let price = basePrice[deviceDetails.deviceType] || 100
-
-  if (deviceDetails.condition === 'new') price *= 1.5
-  if (deviceDetails.condition === 'damaged') price *= 0.6
-
-  // Adjust based on purchase year
-  const currentYear = new Date().getFullYear()
-  const age = currentYear - parseInt(deviceDetails.purchaseYear)
-  price *= Math.max(0.5, 1 - age * 0.1)
-
-  return Math.round(price)
-}
-
-// Mock function to simulate sending data to admin and waiting for approval
-const sendToAdminForApproval = async (formData) => {
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 3000))
-  // Simulate 80% chance of approval
-  return Math.random() < 0.8
-}
+// Remove the basePrices object as we'll fetch real-time prices
 
 export default function PriceEstimation({ onNext, onPrev, formData, updateFormData }) {
-  const [estimatedPrice, setEstimatedPrice] = useState(0)
   const [status, setStatus] = useState('initial') // 'initial', 'pending', 'approved', 'rejected'
+  const [estimatedPrice, setEstimatedPrice] = useState(0)
+  const [realTimePrices, setRealTimePrices] = useState({})
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const price = estimatePrice(formData)
-    setEstimatedPrice(price)
-  }, [formData])
+    fetchRealTimePrices()
+  }, [])
+
+  useEffect(() => {
+    if (Object.keys(realTimePrices).length > 0) {
+      calculateEstimatedPrice()
+    }
+  }, [formData, realTimePrices])
+
+  const fetchRealTimePrices = async () => {
+    try {
+      // Replace this with your actual API endpoint
+      const response = await fetch('/api/real-time-prices')
+      const data = await response.json()
+      setRealTimePrices(data)
+      setLoading(false)
+    } catch (error) {
+      console.error('Error fetching real-time prices:', error)
+      setLoading(false)
+    }
+  }
+
+  const calculateEstimatedPrice = () => {
+    const { brand, model, condition, storage, defects, yearOfPurchase } = formData.deviceDetails
+    let price = realTimePrices[brand]?.[model] || 500 // Default to 500 if not found
+
+    // Adjust price based on condition
+    if (condition === 'new') {
+      price *= 1.2
+    } else if (condition === 'fair') {
+      price *= 0.8
+    } else if (condition === 'poor') {
+      price *= 0.6
+    }
+
+    // Adjust price based on storage
+    const storageGB = parseInt(storage)
+    if (storageGB >= 512) {
+      price += 200
+    } else if (storageGB >= 256) {
+      price += 100
+    } else if (storageGB >= 128) {
+      price += 50
+    }
+
+    // Deduct price for defects
+    price -= defects.length * 50
+
+    // Adjust price based on year of purchase
+    const currentYear = new Date().getFullYear()
+    const age = currentYear - parseInt(yearOfPurchase)
+    price -= age * 50
+
+    setEstimatedPrice(Math.max(Math.round(price), 0))
+  }
 
   const handleAccept = async () => {
     setStatus('pending')
-    try {
-      const approved = await sendToAdminForApproval({ ...formData, estimatedPrice })
+    // Simulate API call for admin approval
+    setTimeout(() => {
+      const approved = Math.random() < 0.8 // 80% chance of approval
+      setStatus(approved ? 'approved' : 'rejected')
       if (approved) {
-        setStatus('approved')
-        updateFormData({ estimatedPrice, status: 'approved' })
-        setTimeout(() => onNext(), 2000) // Move to next step after 2 seconds
-      } else {
-        setStatus('rejected')
+        updateFormData({ status: 'approved', estimatedPrice }, 'priceEstimation')
+        setTimeout(onNext, 2000) // Move to next step after 2 seconds
       }
-    } catch (error) {
-      console.error('Error during admin approval:', error)
-      setStatus('rejected')
-    }
+    }, 3000)
+  }
+
+  if (loading) {
+    return (
+      <Card className="w-full max-w-2xl mx-auto">
+        <CardContent className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <p className="ml-2">Loading real-time prices...</p>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -70,11 +104,13 @@ export default function PriceEstimation({ onNext, onPrev, formData, updateFormDa
       <CardContent>
         <p className="text-4xl font-bold text-center text-primary">${estimatedPrice}</p>
         <ul className="mt-4 space-y-2">
-          <li><strong>Device Type:</strong> {formData.deviceType}</li>
-          <li><strong>Brand:</strong> {formData.brand}</li>
-          <li><strong>Model:</strong> {formData.model}</li>
-          <li><strong>Condition:</strong> {formData.condition}</li>
-          <li><strong>Purchase Year:</strong> {formData.purchaseYear}</li>
+          <li><strong>Device Type:</strong> {formData.deviceSelection.deviceType}</li>
+          <li><strong>Brand:</strong> {formData.deviceDetails.brand}</li>
+          <li><strong>Model:</strong> {formData.deviceDetails.model}</li>
+          <li><strong>Condition:</strong> {formData.deviceDetails.condition}</li>
+          <li><strong>Purchase Year:</strong> {formData.deviceDetails.yearOfPurchase}</li>
+          <li><strong>Storage:</strong> {formData.deviceDetails.storage}</li>
+          <li><strong>Defects:</strong> {formData.deviceDetails.defects.join(', ') || 'None'}</li>
         </ul>
         {status === 'pending' && (
           <Alert className="mt-4">

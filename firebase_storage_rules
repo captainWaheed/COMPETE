@@ -1,0 +1,23 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow read access to all users for public images
+    match /device-images/{imageId} {
+      allow read: if true;
+      allow write: if request.resource.size < 5 * 1024 * 1024 // 5MB
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // Allow users to upload ID images
+    match /id-images/{imageId} {
+      allow read, write: if request.resource.size < 5 * 1024 * 1024 // 5MB
+                         && request.resource.contentType.matches('image/.*');
+    }
+
+    // Deny access to all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

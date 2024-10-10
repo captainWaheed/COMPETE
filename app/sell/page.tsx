@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import Cookies from 'js-cookie'
 import DeviceSelection from '@/components/DeviceSelection'
 import DeviceDetails from '@/components/DeviceDetails'
 import PickupParcelSelection from '@/components/PickupParcelSelection'
 import UserVerification from '@/components/UserVerification'
 import PriceEstimation from '@/components/PriceEstimation'
-import { supabase } from '@/lib/supabase'
-import { toast } from '@/components/ui/use-toast'
+import ReviewAndSubmit from '@/components/ReviewAndSubmit'
+import { db } from '@/lib/firebase'
+import { collection, addDoc } from 'firebase/firestore'
+import { useToast } from "@/components/ui/use-toast"
 
 const steps = [
   'Device Selection',
@@ -17,6 +18,7 @@ const steps = [
   'Pickup or Parcel',
   'User Verification',
   'Price Estimation',
+  'Review and Submit'
 ]
 
 interface FormData {
@@ -61,6 +63,7 @@ interface FormData {
 }
 
 export default function SellPage() {
+  const { toast } = useToast()
   const [currentStep, setCurrentStep] = useState(0)
   const [formData, setFormData] = useState<FormData>({
     deviceSelection: {},
@@ -71,12 +74,10 @@ export default function SellPage() {
   })
 
   useEffect(() => {
-    const savedData = Cookies.get('sellFormData')
-    if (savedData) {
+    const savedData = localStorage.getItem('sellFormData')
+    const savedStep = localStorage.getItem('currentStep')
+    if (savedData && savedStep) {
       setFormData(JSON.parse(savedData))
-    }
-    const savedStep = Cookies.get('currentStep')
-    if (savedStep) {
       setCurrentStep(parseInt(savedStep))
     }
   }, [])
@@ -84,63 +85,80 @@ export default function SellPage() {
   const nextStep = () => {
     const newStep = Math.min(currentStep + 1, steps.length - 1)
     setCurrentStep(newStep)
-    Cookies.set('currentStep', newStep.toString())
+    localStorage.setItem('currentStep', newStep.toString())
   }
 
   const prevStep = () => {
     const newStep = Math.max(currentStep - 1, 0)
     setCurrentStep(newStep)
-    Cookies.set('currentStep', newStep.toString())
+    localStorage.setItem('currentStep', newStep.toString())
   }
 
   const updateFormData = (stepData: Partial<FormData[keyof FormData]>, step: keyof FormData) => {
     const updatedData = { ...formData, [step]: { ...formData[step], ...stepData } }
     setFormData(updatedData)
-    Cookies.set('sellFormData', JSON.stringify(updatedData))
-
-    // Save to Supabase if it's the final step
-    if (currentStep === steps.length - 1) {
-      saveToSupabase(updatedData)
-    }
+    localStorage.setItem('sellFormData', JSON.stringify(updatedData))
   }
 
-  const saveToSupabase = async (data: FormData) => {
+  const saveToFirebase = async (data: FormData) => {
     try {
-      const { data: savedData, error } = await supabase
-        .from('sell_requests')
-        .upsert({ ...data, updated_at: new Date() }, { onConflict: 'id' })
-
-      if (error) throw error
-      console.log('Data saved to Supabase:', savedData)
+      const docRef = await addDoc(collection(db, 'sell_requests'), {
+        device_type: data.deviceSelection.deviceType,
+        brand: data.deviceDetails.brand,
+        model: data.deviceDetails.model,
+        year_of_purchase: data.deviceDetails.yearOfPurchase,
+        condition: data.deviceDetails.condition,
+        storage: data.deviceDetails.storage,
+        defects: data.deviceDetails.defects,
+        serial_number: data.deviceDetails.serialNumber,
+        images: data.deviceDetails.images,
+        delivery_method: data.pickupParcel.deliveryMethod,
+        pickup_address: data.pickupParcel.pickupDetails?.address,
+        pickup_date: data.pickupParcel.pickupDetails?.preferredDate,
+        pickup_instructions: data.pickupParcel.pickupDetails?.specialInstructions,
+        parcel_tracking: data.pickupParcel.parcelDetails?.trackingNumber,
+        parcel_courier: data.pickupParcel.parcelDetails?.courierName,
+        full_name: data.userVerification.fullName,
+        id_type: data.userVerification.idType,
+        id_number: data.userVerification.idNumber,
+        cnic: data.userVerification.cnic,
+        email: data.userVerification.email,
+        phone_number: data.userVerification.phoneNumber,
+        id_image: data.userVerification.idImage,
+        estimated_price: data.priceEstimation.estimatedPrice,
+        price_status: data.priceEstimation.status,
+        created_at: new Date().toISOString(),
+      });
+      console.log('Data saved to Firebase:', docRef.id);
       toast({
         title: "Success",
         description: "Your sell request has been submitted successfully!",
-      })
-      // Reset form and cookies after successful submission
+      });
+      // Reset form and localStorage after successful submission
       setFormData({
         deviceSelection: {},
         deviceDetails: {},
         pickupParcel: {},
         userVerification: {},
         priceEstimation: {},
-      })
-      setCurrentStep(0)
-      Cookies.remove('sellFormData')
-      Cookies.remove('currentStep')
+      });
+      setCurrentStep(0);
+      localStorage.removeItem('sellFormData');
+      localStorage.removeItem('currentStep');
     } catch (error) {
-      console.error('Error saving data to Supabase:', error)
+      console.error('Detailed error:', error);
       toast({
         title: "Error",
         description: "There was an error submitting your request. Please try again.",
         variant: "destructive",
-      })
+      });
     }
   }
 
   const renderStep = () => {
     switch (currentStep) {
       case 0:
-        return <DeviceSelection onNext={nextStep} updateFormData={(data) => updateFormData(data, 'deviceSelection')} formData={formData.deviceSelection} />
+        return <DeviceSelection onNext={(data) => { updateFormData(data, 'deviceSelection'); nextStep(); }} />
       case 1:
         return <DeviceDetails 
           onNext={nextStep} 
@@ -149,15 +167,31 @@ export default function SellPage() {
           formData={formData.deviceDetails} 
         />
       case 2:
-        return <PickupParcelSelection onNext={nextStep} onPrev={prevStep} updateFormData={(data) => updateFormData(data, 'pickupParcel')} formData={formData.pickupParcel} />
+        return <PickupParcelSelection 
+          onNext={nextStep} 
+          onPrev={prevStep} 
+          updateFormData={(data) => updateFormData(data, 'pickupParcel')} 
+          formData={formData.pickupParcel} 
+        />
       case 3:
-        return <UserVerification onNext={nextStep} onPrev={prevStep} updateFormData={(data) => updateFormData(data, 'userVerification')} formData={formData.userVerification} />
+        return <UserVerification 
+          onNext={nextStep} 
+          onPrev={prevStep} 
+          updateFormData={(data) => updateFormData(data, 'userVerification')} 
+          formData={formData.userVerification} 
+        />
       case 4:
         return <PriceEstimation 
-          onNext={() => saveToSupabase(formData)} 
+          onNext={nextStep} 
           onPrev={prevStep} 
           formData={formData} 
           updateFormData={(data) => updateFormData(data, 'priceEstimation')} 
+        />
+      case 5:
+        return <ReviewAndSubmit 
+          onPrev={prevStep} 
+          formData={formData}
+          onSubmit={() => saveToFirebase(formData)}
         />
       default:
         return null

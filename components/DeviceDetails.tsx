@@ -8,6 +8,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useDropzone } from 'react-dropzone'
+import { storage } from '@/lib/firebase'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 
 const brands = {
   Apple: ['iPhone 14 Pro Max', 'iPhone 14 Pro', 'iPhone 14', 'iPhone 13 Pro', 'iPhone 13'],
@@ -27,6 +29,17 @@ const modelYears = {
   'Galaxy S23': [2023],
   'Galaxy S22 Ultra': [2022],
   'Galaxy S22+': [2022]
+}
+
+const handleImageUpload = async (file: File) => {
+  try {
+    const storageRef = ref(storage, `device-images/${file.name}`)
+    await uploadBytes(storageRef, file)
+    return await getDownloadURL(storageRef)
+  } catch (error) {
+    console.error('Error uploading image:', error)
+    throw new Error("Failed to upload image. Please try again.")
+  }
 }
 
 export default function DeviceDetails({ onNext, onPrev, updateFormData, formData }) {
@@ -128,19 +141,37 @@ export default function DeviceDetails({ onNext, onPrev, updateFormData, formData
     return Math.max(basePrice, 0) // Ensure price doesn't go below 0
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const estimatedPrice = calculateEstimatedPrice()
     const updatedDetails = { ...deviceDetails, estimatedPrice }
-    setDeviceDetails(updatedDetails)
-    updateFormData(updatedDetails)
-    onNext()
+
+    try {
+      // Upload images to Firebase Storage
+      const imageUrls = await Promise.all(
+        updatedDetails.images.map(async (file) => {
+          if (file instanceof File) {
+            return await handleImageUpload(file)
+          }
+          return file
+        })
+      )
+
+      const finalDetails = { ...updatedDetails, images: imageUrls }
+      setDeviceDetails(finalDetails)
+      updateFormData(finalDetails)
+      onNext()
+    } catch (error) {
+      console.error('Error uploading images:', error)
+      // Handle the error here, e.g., show an error message to the user
+      // You can use setState to update an error message state and display it in the UI
+    }
   }
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
-      <CardContent className="p-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="brand">Brand</Label>
@@ -280,6 +311,18 @@ export default function DeviceDetails({ onNext, onPrev, updateFormData, formData
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="serialNumber">Serial Number / IMEI</Label>
+            <Input
+              id="serialNumber"
+              name="serialNumber"
+              value={deviceDetails.serialNumber}
+              onChange={handleInputChange}
+              placeholder="Enter device serial number or IMEI"
+              required
+            />
           </div>
 
           <div className="flex justify-between">

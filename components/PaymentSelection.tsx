@@ -6,7 +6,8 @@ import stripePromise from '@/lib/stripe'
 import StripePaymentForm from '@/components/StripePaymentForm'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/hooks/use-toast'
-import { supabase } from '@/lib/supabase'
+import { db } from '@/lib/firebase'
+import { collection, addDoc } from 'firebase/firestore'
 
 export default function PaymentSelection({ onPrev, formData }) {
   const [clientSecret, setClientSecret] = useState('')
@@ -24,28 +25,22 @@ export default function PaymentSelection({ onPrev, formData }) {
 
   const handlePaymentSuccess = async () => {
     try {
-      const { data, error } = await supabase
-        .from('transactions')
-        .insert({
-          ...formData,
-          status: 'paid',
-        })
-
-      if (error) {
-        throw error
-      }
+      const docRef = await addDoc(collection(db, 'transactions'), {
+        ...formData,
+        status: 'paid',
+      });
 
       toast({
         title: "Success!",
         description: "Your payment has been processed and your device sale is complete.",
-      })
+      });
     } catch (error) {
-      console.error('Error recording transaction:', error)
+      console.error('Error recording transaction:', error);
       toast({
         title: "Error",
         description: "There was a problem recording your transaction. Please contact support.",
         variant: "destructive",
-      })
+      });
     }
   }
 

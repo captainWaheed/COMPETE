@@ -8,7 +8,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <header className="bg-white shadow-sm">
         <nav className="container mx-auto px-4 py-4 flex justify-between items-center">
           <Link href="/" className="text-2xl font-bold">
-            Buyback Website
+            Buyback
           </Link>
           <div className="space-x-4">
             <Button asChild variant="ghost">

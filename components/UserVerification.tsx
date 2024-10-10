@@ -7,9 +7,12 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { toast } from '@/components/ui/use-toast'
+import { useToast } from "@/components/ui/use-toast"
+import { storage } from '@/lib/firebase'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 
 export default function UserVerification({ onNext, onPrev, updateFormData }) {
+  const { toast } = useToast()
   const [formData, setFormData] = useState({
     fullName: '',
     idType: '',
@@ -49,6 +52,24 @@ export default function UserVerification({ onNext, onPrev, updateFormData }) {
     return true
   }
 
+  const handleIdImageUpload = async (file: File) => {
+    try {
+      const fileName = `${Date.now()}_${file.name}`
+      const storageRef = ref(storage, `id-images/${fileName}`)
+      const snapshot = await uploadBytes(storageRef, file)
+      const downloadURL = await getDownloadURL(snapshot.ref)
+      return downloadURL
+    } catch (error) {
+      console.error('Error uploading ID image:', error)
+      toast({
+        title: "Error",
+        description: "Failed to upload ID image. Please try again.",
+        variant: "destructive",
+      })
+      throw error
+    }
+  }
+
   const simulateVerification = () => {
     setIsSubmitting(true)
     // Simulating an asynchronous verification process
@@ -69,10 +90,28 @@ export default function UserVerification({ onNext, onPrev, updateFormData }) {
     }, 3000)
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (validateForm()) {
-      simulateVerification()
+      setIsSubmitting(true)
+      try {
+        // Upload ID image to Firebase Storage
+        if (formData.idImage instanceof File) {
+          const idImageUrl = await handleIdImageUpload(formData.idImage)
+          setFormData(prev => ({ ...prev, idImage: idImageUrl }))
+        }
+        
+        updateFormData({ ...formData, idImage: formData.idImage instanceof File ? await handleIdImageUpload(formData.idImage) : formData.idImage })
+        simulateVerification()
+      } catch (error) {
+        console.error('Error uploading ID image:', error)
+        toast({
+          title: "Error",
+          description: "There was a problem uploading your ID image. Please try again.",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+      }
     }
   }
 
