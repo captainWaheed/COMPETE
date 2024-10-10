@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 export default function Home() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen py-2">
-      <main className="flex flex-col items-center justify-center flex-1 px-20 text-center">
+      <div className="flex flex-col items-center justify-center flex-1 px-20 text-center">
         <h1 className="text-6xl font-bold mb-8">
           Welcome to the Buyback Website
         </h1>
@@ -19,7 +19,7 @@ export default function Home() {
             <Link href="/about">Learn More</Link>
           </Button>
         </div>
-      </main>
+      </div>
     </div>
   )
 }

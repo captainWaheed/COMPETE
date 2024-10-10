@@ -2,25 +2,19 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-
-const deviceTypes = ['Smartphone', 'Tablet', 'Laptop']
+import { Card, CardContent } from '@/components/ui/card'
+import Image from 'next/image'
 
 interface DeviceSelectionProps {
-  onNext: () => void
-  updateFormData: (data: { deviceType: string }) => void
+  onNext: (deviceType: string) => void
 }
 
-export default function DeviceSelection({ onNext, updateFormData }: DeviceSelectionProps) {
-  const [selectedType, setSelectedType] = useState<string>('')
+export default function DeviceSelection({ onNext }: DeviceSelectionProps) {
+  const [selectedType, setSelectedType] = useState<string | null>(null)
 
-  const handleNext = () => {
-    if (selectedType) {
-      updateFormData({ deviceType: selectedType })
-      onNext()
-    }
+  const handleSelect = (type: string) => {
+    setSelectedType(type)
+    onNext(type)
   }
 
   return (
@@ -29,33 +23,46 @@ export default function DeviceSelection({ onNext, updateFormData }: DeviceSelect
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.5 }}
+      className="w-full max-w-4xl mx-auto px-4"
     >
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader>
-          <CardTitle className="text-2xl font-semibold text-center text-primary">Select Device Type</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Select onValueChange={setSelectedType}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select device type" />
-            </SelectTrigger>
-            <SelectContent>
-              {deviceTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button 
-            onClick={handleNext} 
-            disabled={!selectedType}
-            className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold py-2 px-4 rounded-full transition-all duration-300 transform hover:scale-105"
-          >
-            Next
-          </Button>
-        </CardContent>
-      </Card>
+      <h1 className="text-3xl font-bold text-center mb-4">Let's get started. The process is simple.</h1>
+      <p className="text-center mb-8">First, please select the device you want to sell.</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card 
+          className={`cursor-pointer transition-all duration-300 transform hover:scale-105 ${
+            selectedType === 'smartphone' ? 'ring-2 ring-blue-500' : ''
+          }`}
+          onClick={() => handleSelect('smartphone')}
+        >
+          <CardContent className="flex flex-col items-center p-6">
+            <h2 className="text-xl font-semibold mb-4">Smartphone</h2>
+            <Image
+              src="https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8aXBob25lfGVufDB8fDB8fHww"
+              alt="Smartphone"
+              width={200}
+              height={200}
+              className="rounded-lg object-cover"
+            />
+          </CardContent>
+        </Card>
+        <Card 
+          className={`cursor-pointer transition-all duration-300 transform hover:scale-105 ${
+            selectedType === 'tablet' ? 'ring-2 ring-blue-500' : ''
+          }`}
+          onClick={() => handleSelect('tablet')}
+        >
+          <CardContent className="flex flex-col items-center p-6">
+            <h2 className="text-xl font-semibold mb-4">Tablet</h2>
+            <Image
+              src="https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8aXBhZHxlbnwwfHwwfHx8MA%3D%3D"
+              alt="Tablet"
+              width={200}
+              height={200}
+              className="rounded-lg object-cover"
+            />
+          </CardContent>
+        </Card>
+      </div>
     </motion.div>
   )
 }
