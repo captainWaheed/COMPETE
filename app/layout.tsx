@@ -1,5 +1,6 @@
 import './globals.css'
 import type { Metadata } from 'next'
+import Layout from "@/components/Layout"
 
 export const metadata: Metadata = {
   title: 'Your App Name',
@@ -19,7 +20,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <Layout>{children}
+        </Layout>
+        </body>
     </html>
   )
 }
